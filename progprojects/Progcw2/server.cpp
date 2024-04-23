@@ -1,17 +1,26 @@
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <mutex>
-#include <set>
-#include <thread>
-#include <boost/asio.hpp>
-#include <boost/filesystem.hpp>
+#include <iostream>             // Includes the standard input/output stream library
+#include <fstream>              // Provides facilities for file-based input/output
+#include <sstream>              // Provides string stream classes
+#include <mutex>                // For using mutexes in multithreading to protect shared data
+#include <set>                  // Provides the set container from the Standard Template Library
+#include <thread>               // Provides the thread class and related functions for threading
+#include <boost/asio.hpp>       // Boost ASIO includes for asynchronous input/output operations
+#include <boost/filesystem.hpp> // Provides facilities to manipulate files and directories
 
+using namespace std;                        // Uses the standard namespace to avoid prefixing std::
+using namespace boost::asio;                // Uses the boost::asio namespace to simplify usage of the library
+using ip::tcp;                              // Simplifies usage of the TCP protocol type under the ip namespace
+using client_ptr = shared_ptr<tcp::socket>; // Defines client_ptr as an alias for shared_ptr managing tcp::socket objects
+using client_set = set<client_ptr>;         // Defines client_set as a set of shared_ptr to tcp::socket for managing multiple clients
+
+
+// MessageNode struct for storing linked list of messages per user
 struct MessageNode {
     string message;
     MessageNode* next;
 };
 
+// Node struct for storing user information and their messages
 struct Node {
     string username;
     string password;
@@ -21,6 +30,7 @@ struct Node {
     Node() : messageHead(nullptr), next(nullptr) {}
 };
 
+// UserList class manages a linked list of users
 class UserList {
 private:
     Node* head;
@@ -28,18 +38,20 @@ private:
 public:
     UserList() : head(nullptr) {}
     ~UserList() {
-        clear();
+        clear();  // Destructor clears all nodes when UserList is destroyed
     }
 
+    // Deletes all nodes from the list
     void clear() {
         while (head != nullptr) {
             Node* temp = head;
             head = head->next;
-            clearMessages(temp);
+            clearMessages(temp); // Clear messages before deleting the user node
             delete temp;
         }
     }
 
+    // Deletes all message nodes for a given user
     void clearMessages(Node* user) {
         while (user->messageHead != nullptr) {
             MessageNode* temp = user->messageHead;
@@ -48,9 +60,10 @@ public:
         }
     }
 
-bool addUser(const string& username, const string& hashedPassword) {
+    // Adds a new user if not already present
+    bool addUser(const string& username, const string& hashedPassword) {
         if (findUser(username)) {
-            return false; // User already exists
+            return false; // Return false if user already exists
         }
         Node* newNode = new Node;
         newNode->username = username;
@@ -60,6 +73,7 @@ bool addUser(const string& username, const string& hashedPassword) {
         return true;
     }
 
+    // Finds a user by username
     Node* findUser(const string& username) {
         Node* current = head;
         while (current) {
@@ -71,6 +85,7 @@ bool addUser(const string& username, const string& hashedPassword) {
         return nullptr;
     }
 
+    // Authenticates a user by comparing hashed passwords
     bool authenticateUser(const string& username, const string& password) {
         hash<string> hasher;
         string hashedInputPassword = to_string(hasher(password));
@@ -81,6 +96,7 @@ bool addUser(const string& username, const string& hashedPassword) {
         return false;
     }
 
+    // Adds a message to the user's message list
     void addMessage(const string& username, const string& message) {
         Node* user = findUser(username);
         if (user) {
@@ -90,28 +106,29 @@ bool addUser(const string& username, const string& hashedPassword) {
         }
     }
 
+    // Saves a user's data to file
     void saveUser(const string& username) {
-    ofstream file("users/" + username + ".txt");
-    if (!file) {
-        cerr << "Unable to open file for saving user data: " << username << endl;
-        return;
+        ofstream file("users/" + username + ".txt");
+        if (!file) {
+            cerr << "Unable to open file for saving user data: " << username << endl;
+            return;
+        }
+        Node* user = findUser(username);
+        if (!user) {
+            cerr << "User not found when trying to save: " << username << endl;
+            return;
+        }
+        file << user->username << '\n';
+        file << user->password << '\n';
+        MessageNode* message = user->messageHead;
+        while (message) {
+            file << message->message << '\n';
+            message = message->next;
+        }
+        file.close();
     }
-    Node* user = findUser(username);
-    if (!user) {
-        cerr << "User not found when trying to save: " << username << endl;
-        return;
-    }
-    file << user->username << '\n';
-    file << user->password << '\n';
-    MessageNode* message = user->messageHead;
-    while (message) {
-        file << message->message << '\n';
-        message = message->next;
-    }
-    file.close();
-}
 
-
+    // Loads a user's data from file
     void loadUser(const string& filename) {
         ifstream file(filename);
         if (!file.is_open()) {
@@ -131,11 +148,16 @@ bool addUser(const string& username, const string& hashedPassword) {
     }
 };
 
-UserList userList;
-io_context io;
-mutex clients_mutex;
-client_set clients;
+UserList userList;  // Creates an instance of the UserList class to manage user data throughout the application.
 
+io_context io;  // Defines an io_context object from Boost ASIO, which is used to manage asynchronous I/O operations.
+
+mutex clients_mutex;  // Defines a mutex used to synchronize access to shared resources (e.g., the client_set) across different threads.
+
+client_set clients;  // Declares a set (container) that will store client_ptr objects (shared pointers to tcp::socket). 
+                     // This is used to manage and track all active client socket connections.
+
+// Function to encrypt a string using Caesar cipher
 string caesar_encrypt(const string& text, int shift) {
     string result;
     for (char c : text) {
@@ -148,10 +170,12 @@ string caesar_encrypt(const string& text, int shift) {
     return result;
 }
 
+// Function to decrypt a string using Caesar cipher
 string caesar_decrypt(const string& text, int shift) {
     return caesar_encrypt(text, 26 - shift);
 }
 
+// Registers a new user and saves their data
 bool register_user(const string& username, const string& password) {
     hash<string> hasher;
     string hashedPassword = to_string(hasher(password));
@@ -162,10 +186,12 @@ bool register_user(const string& username, const string& password) {
     return true;
 }
 
+// Authenticates a user
 bool authenticate_user(const string& username, const string& password) {
     return userList.authenticateUser(username, password);
 }
 
+// Broadcasts a message to all clients except the sender
 void broadcast_message(const string& message, const client_ptr& sender) {
     lock_guard<mutex> lock(clients_mutex);
     cout << "Forwarding encrypted message: " << message << endl;
@@ -180,6 +206,7 @@ void broadcast_message(const string& message, const client_ptr& sender) {
     }
 }
 
+// Handles a single client's requests and interactions
 void handle_client(client_ptr client) {
     try {
         while (true) {
@@ -198,7 +225,7 @@ void handle_client(client_ptr client) {
             string password;
             getline(is, password);
 
-           cout << "Received action: " << username << " has " << action << endl;
+            cout << "Received action: " << username << " has " << action << endl;
 
             if (action == "login") {
                 if (!authenticate_user(username, password)) {
@@ -232,7 +259,7 @@ void handle_client(client_ptr client) {
                     
                     // Check if the decrypted message contains "logout"
                     if (decrypted_message.find("logout") != string::npos) {
-                        cout << "Received action: "  << username << " has loged out" << endl;
+                        cout << "Received action: "  << username << " has logged out" << endl;
                         return; // Exit the handle_client function
                     }
 
@@ -240,7 +267,7 @@ void handle_client(client_ptr client) {
                     broadcast_message(encrypted_message, client);
 
                     // Decrypt and store the message for the user
-                    userList.addMessage(username, encrypted_message);
+                    userList.addMessage(username, decrypted_message);
                 }
             }
         }
@@ -250,12 +277,18 @@ void handle_client(client_ptr client) {
         clients.erase(client);
     }
 }
+
+// Main function to initialize server, load users, and accept client connections
 int main() {
-    io_context io;
-    tcp::socket socket(io);
-    tcp::resolver resolver(io);
-    
     try {
+        boost::filesystem::path userDir("users");
+        boost::filesystem::create_directories(userDir);
+        if (boost::filesystem::exists(userDir) && boost::filesystem::is_directory(userDir)) {
+            for (auto& entry : boost::filesystem::directory_iterator(userDir)) {
+                userList.loadUser(entry.path().string());
+            }
+        }
+
         tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), 1234));
         while (true) {
             client_ptr new_client = make_shared<tcp::socket>(io);
