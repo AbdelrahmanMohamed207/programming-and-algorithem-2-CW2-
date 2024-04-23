@@ -7,6 +7,47 @@
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
 
+struct MessageNode {
+    string message;
+    MessageNode* next;
+};
+
+struct Node {
+    string username;
+    string password;
+    MessageNode* messageHead;
+    Node* next;
+
+    Node() : messageHead(nullptr), next(nullptr) {}
+};
+
+class UserList {
+private:
+    Node* head;
+
+public:
+    UserList() : head(nullptr) {}
+    ~UserList() {
+        clear();
+    }
+
+    void clear() {
+        while (head != nullptr) {
+            Node* temp = head;
+            head = head->next;
+            clearMessages(temp);
+            delete temp;
+        }
+    }
+
+    void clearMessages(Node* user) {
+        while (user->messageHead != nullptr) {
+            MessageNode* temp = user->messageHead;
+            user->messageHead = user->messageHead->next;
+            delete temp;
+        }
+    }
+
 bool addUser(const string& username, const string& hashedPassword) {
         if (findUser(username)) {
             return false; // User already exists
