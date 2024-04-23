@@ -3,6 +3,10 @@
 #include <thread>
 #include <cctype> // For isalpha and islower
 
+using namespace boost::asio;
+using namespace std;
+using ip::tcp;
+
 void read_messages(tcp::socket& socket, int shift) {
     try {
         while (true) {
