@@ -44,10 +44,18 @@ void read_messages(tcp::socket& socket, int shift) {
 
 void write_messages(tcp::socket& socket, const string& username, int shift) {
     try {
-        while (true) {
+        while (running) {
             string msg;
-            cout << "Enter message: ";
+            cout << "Enter message (type 'logout' to exit): ";
             getline(cin, msg);
+            if (msg == "logout") {
+                running = false;
+                cout << "Logging out and exiting..." << endl;
+                // Send a logout command to the server
+                string encrypted_logout = caesar_encrypt("logout", shift); // Encrypt the word "logout"
+                write(socket, buffer(encrypted_logout + "\n"));
+                break; // Break the loop and exit
+            }
             // Prepend the username before encrypting
             string message_with_name = username + ": " + msg;
             string encrypted_msg = caesar_encrypt(message_with_name, shift);
