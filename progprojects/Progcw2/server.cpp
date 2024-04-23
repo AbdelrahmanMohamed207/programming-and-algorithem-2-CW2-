@@ -152,3 +152,22 @@ void handle_client(client_ptr client) {
         clients.erase(client);
     }
 }
+
+int main() {
+    try {
+        tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), 1234));
+        while (true) {
+            client_ptr new_client = make_shared<tcp::socket>(io);
+            acceptor.accept(*new_client);
+
+            new_client->set_option(tcp::no_delay(true));
+
+            thread([new_client]() {
+                handle_client(new_client);
+            }).detach();
+        }
+    } catch (const exception& e) {
+        cerr << "Server exception: " << e.what() << "\n";
+    }
+    return 0;
+}
