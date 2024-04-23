@@ -198,7 +198,7 @@ void handle_client(client_ptr client) {
             string password;
             getline(is, password);
 
-            cout << "Received action: " << action << ", Username: " << username << ", Password: " << password << endl;
+           cout << "Received action: " << username << " has " << action << endl;
 
             if (action == "login") {
                 if (!authenticate_user(username, password)) {
@@ -227,11 +227,19 @@ void handle_client(client_ptr client) {
                 if (getline(is, encrypted_message)) {
                     if (encrypted_message.empty()) break;
 
+                    // Decrypt the message
+                    string decrypted_message = caesar_decrypt(encrypted_message, 3);
+                    
+                    // Check if the decrypted message contains "logout"
+                    if (decrypted_message.find("logout") != string::npos) {
+                        cout << "Received action: "  << username << " has loged out" << endl;
+                        return; // Exit the handle_client function
+                    }
+
                     // Forwarding the encrypted message
                     broadcast_message(encrypted_message, client);
 
                     // Decrypt and store the message for the user
-                    string decrypted_message = caesar_decrypt(encrypted_message, 3);
                     userList.addMessage(username, encrypted_message);
                 }
             }
@@ -242,7 +250,6 @@ void handle_client(client_ptr client) {
         clients.erase(client);
     }
 }
-
 int main() {
     io_context io;
     tcp::socket socket(io);
