@@ -7,6 +7,24 @@ using namespace boost::asio;
 using namespace std;
 using ip::tcp;
 
+// Caesar Cipher Encryption
+string caesar_encrypt(const string& text, int shift) {
+    string result;
+    for (char c : text) {
+        if (isalpha(c)) {
+            char base = islower(c) ? 'a' : 'A';
+            c = static_cast<char>(((c - base + shift) % 26) + base);
+        }
+        result.push_back(c);
+    }
+    return result;
+}
+
+// Caesar Cipher Decryption
+string caesar_decrypt(const string& text, int shift) {
+    return caesar_encrypt(text, 26 - shift); // Decrypt by shifting the opposite way
+}
+
 void read_messages(tcp::socket& socket, int shift) {
     try {
         while (true) {
