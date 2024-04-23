@@ -228,6 +228,10 @@ void handle_client(client_ptr client) {
 }
 
 int main() {
+    io_context io;
+    tcp::socket socket(io);
+    tcp::resolver resolver(io);
+    
     try {
         tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), 1234));
         while (true) {
