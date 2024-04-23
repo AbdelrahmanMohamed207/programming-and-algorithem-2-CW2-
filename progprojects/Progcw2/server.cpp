@@ -136,6 +136,22 @@ io_context io;
 mutex clients_mutex;
 client_set clients;
 
+string caesar_encrypt(const string& text, int shift) {
+    string result;
+    for (char c : text) {
+        if (isalpha(c)) {
+            char base = islower(c) ? 'a' : 'A';
+            c = static_cast<char>(((c - base + shift) % 26) + base);
+        }
+        result.push_back(c);
+    }
+    return result;
+}
+
+string caesar_decrypt(const string& text, int shift) {
+    return caesar_encrypt(text, 26 - shift);
+}
+
 bool register_user(const string& username, const string& password) {
     hash<string> hasher;
     string hashedPassword = to_string(hasher(password));
