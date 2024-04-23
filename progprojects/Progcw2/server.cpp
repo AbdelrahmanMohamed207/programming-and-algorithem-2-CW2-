@@ -90,6 +90,34 @@ bool addUser(const string& username, const string& hashedPassword) {
     }
 };
 
+bool register_user(const string& username, const string& password) {
+    hash<string> hasher;
+    string hashedPassword = to_string(hasher(password));
+    if (!userList.addUser(username, hashedPassword)) {
+        return false;
+    }
+    userList.saveUser(username); // Save user data to file
+    return true;
+}
+
+bool authenticate_user(const string& username, const string& password) {
+    return userList.authenticateUser(username, password);
+}
+
+void broadcast_message(const string& message, const client_ptr& sender) {
+    lock_guard<mutex> lock(clients_mutex);
+    cout << "Forwarding encrypted message: " << message << endl;
+    for (auto& client : clients) {
+        if (client != sender) {
+            async_write(*client, buffer(message + "\n"), [](const boost::system::error_code& ec, std::size_t length) {
+                if (ec) {
+                    cerr << "Error sending message: " << ec.message() << endl;
+                }
+            });
+        }
+    }
+}
+
 void handle_client(client_ptr client) {
     try {
         while (true) {
