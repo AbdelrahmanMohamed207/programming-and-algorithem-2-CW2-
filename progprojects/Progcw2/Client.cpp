@@ -3,6 +3,39 @@
 #include <thread>
 #include <cctype> // For isalpha and islower
 
+void read_messages(tcp::socket& socket, int shift) {
+    try {
+        while (true) {
+            boost::asio::streambuf buf;
+            read_until(socket, buf, "\n");
+            istream response_stream(&buf);
+            string response;
+            getline(response_stream, response);
+            if (!response.empty()) {
+                cout << "Received: " << caesar_decrypt(response, shift) << endl;
+            }
+        }
+    } catch (const std::exception& e) {
+        cerr << "Read error: " << e.what() << endl;
+    }
+}
+
+void write_messages(tcp::socket& socket, const string& username, int shift) {
+    try {
+        while (true) {
+            string msg;
+            cout << "Enter message: ";
+            getline(cin, msg);
+            // Prepend the username before encrypting
+            string message_with_name = username + ": " + msg;
+            string encrypted_msg = caesar_encrypt(message_with_name, shift);
+            write(socket, buffer(encrypted_msg + "\n"));
+        }
+    } catch (const std::exception& e) {
+        cerr << "Write error: " << e.what() << endl;
+    }
+}
+
 int main() {
     int shift = 3; // Caesar shift amount
     io_context io;
