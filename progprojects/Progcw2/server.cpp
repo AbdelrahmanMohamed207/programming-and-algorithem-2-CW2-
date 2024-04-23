@@ -89,3 +89,66 @@ bool addUser(const string& username, const string& hashedPassword) {
         file.close();
     }
 };
+
+void handle_client(client_ptr client) {
+    try {
+        while (true) {
+            boost::asio::streambuf buf;
+            istream is(&buf);
+
+            read_until(*client, buf, "\n");
+            string action;
+            getline(is, action);
+
+            read_until(*client, buf, "\n");
+            string username;
+            getline(is, username);
+
+            read_until(*client, buf, "\n");
+            string password;
+            getline(is, password);
+
+            cout << "Received action: " << action << ", Username: " << username << ", Password: " << password << endl;
+
+            if (action == "login") {
+                if (!authenticate_user(username, password)) {
+                    cerr << "Authentication failed for user: " << username << endl;
+                    write(*client, buffer("Authentication failed.\n"));
+                    return;
+                }
+                write(*client, buffer("Welcome " + username + "!\n"));
+            } else if (action == "register") {
+                if (!register_user(username, password)) {
+                    write(*client, buffer("Registration failed, user already exists.\n"));
+                    return;
+                }
+                write(*client, buffer("Registration successful.\n"));
+            } else {
+                cerr << "Invalid action: " << action << endl;
+                write(*client, buffer("Invalid action.\n"));
+                return;
+            }
+
+            clients.insert(client);
+
+            while (true) {
+                read_until(*client, buf, "\n");
+                string encrypted_message;
+                if (getline(is, encrypted_message)) {
+                    if (encrypted_message.empty()) break;
+
+                    // Forwarding the encrypted message
+                    broadcast_message(encrypted_message, client);
+
+                    // Decrypt and store the message for the user
+                    string decrypted_message = caesar_decrypt(encrypted_message, 3);
+                    userList.addMessage(username, encrypted_message);
+                }
+            }
+        }
+    } catch (const exception& e) {
+        cerr << "Client disconnected: " << e.what() << "\n";
+        lock_guard<mutex> lock(clients_mutex);
+        clients.erase(client);
+    }
+}
