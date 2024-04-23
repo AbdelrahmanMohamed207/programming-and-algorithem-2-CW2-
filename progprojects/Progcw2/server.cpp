@@ -131,6 +131,11 @@ bool addUser(const string& username, const string& hashedPassword) {
     }
 };
 
+UserList userList;
+io_context io;
+mutex clients_mutex;
+client_set clients;
+
 bool register_user(const string& username, const string& password) {
     hash<string> hasher;
     string hashedPassword = to_string(hasher(password));
